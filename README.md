@@ -137,8 +137,8 @@ Filming them identified each game.
   checksum as their argument when none is sent. After our scan the box's own buttons no
   longer worked as before.
 - **Game numbers above 5 can freeze the box.** Ours stopped responding to Bluetooth and its
-  buttons. If yours does, let the battery run flat or open the case and unplug the battery
-  for a few seconds.
+  buttons. If yours does, press the **reset hole** (a pinhole on the side, just below the
+  power button, marked 7 in Divoom's manual) with a paperclip, then hold power to switch it on.
 - `tb` never writes alarms, reminders or firmware settings, and the scan's raw logs are not
   published because they contain the owner's alarms and reminders.
 
