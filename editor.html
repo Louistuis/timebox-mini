@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TimeBox Pixel Editor</title>
+<style>
+:root {
+  --bg: #f5f5f7; --panel: #ffffff; --text: #1d1d1f; --muted: #6e6e73;
+  --line: #d2d2d7; --accent: #0071e3; --accent-text: #ffffff; --ok: #1f8f4a; --bad: #c9342b;
+  --screen: #0b0b0c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111113; --panel: #1c1c1e; --text: #f5f5f7; --muted: #98989d;
+    --line: #38383a; --accent: #0a84ff; --accent-text: #000000; --ok: #34c759; --bad: #ff6961; --screen: #000;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111113; --panel: #1c1c1e; --text: #f5f5f7; --muted: #98989d;
+  --line: #38383a; --accent: #0a84ff; --accent-text: #000000; --ok: #34c759; --bad: #ff6961; --screen: #000;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+}
+main { max-width: 900px; margin: 0 auto; padding: 24px 16px 48px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+h1 { font-size: 22px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+.pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+.pill.on .dot { background: var(--ok); }
+.layout { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+.screen {
+  display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; width: 100%; aspect-ratio: 1;
+  background: var(--screen); padding: 10px; border-radius: 18px; touch-action: none; user-select: none;
+  border: 1px solid var(--line);
+}
+.cell { border-radius: 5px; background: #000; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+.panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+button, select, input[type="text"], input[type="number"] {
+  font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 9px; padding: 7px 12px; min-height: 34px;
+}
+input[type="number"] { width: 92px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: default; border-color: var(--line); }
+button.active, button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="color"] { width: 40px; height: 34px; padding: 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); }
+input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+.swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 10px; }
+.sw { aspect-ratio: 1; border-radius: 8px; border: 2px solid transparent; padding: 0; min-height: 0; }
+.sw.sel { border-color: var(--accent); }
+label.inline { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.frames { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 14px 0 10px; }
+.frame { position: relative; padding: 0; min-height: 0; border-radius: 8px; overflow: hidden; border: 2px solid var(--line); background: #000; }
+.frame.sel { border-color: var(--accent); }
+.frame canvas { display: block; width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+.frame span { position: absolute; right: 4px; bottom: 2px; font-size: 11px; color: #fff; text-shadow: 0 0 3px #000; }
+.saved { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; margin-top: 10px; }
+.thumb { position: relative; text-align: center; font-size: 12px; color: var(--muted); }
+.thumb canvas { width: 100%; aspect-ratio: 1; border-radius: 8px; background: #000; cursor: pointer; image-rendering: pixelated; border: 1px solid var(--line); }
+.thumb button.del { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; min-height: 0; padding: 0; border-radius: 50%; font-size: 13px; line-height: 1; }
+.hint { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>TimeBox Pixel Editor</h1>
+    <div class="row">
+      <span class="pill" id="pill"><span class="dot"></span><span id="pilltext">Checking</span></span>
+      <button id="connect" hidden>Connect</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section>
+      <div class="screen" id="screen" aria-label="Drawing area, 11 by 11 pixels"></div>
+      <p class="hint">Colours are rounded to 16 levels per channel, like the real display.</p>
+
+      <div class="panel" style="margin-top:14px">
+        <h2>Animation</h2>
+        <div class="row">
+          <button id="addframe">Add frame</button>
+          <button id="delframe">Delete frame</button>
+          <label class="inline">Frame time <input type="number" id="delay" min="200" max="25500" step="100" value="300"> ms</label>
+        </div>
+        <div class="frames" id="frames"></div>
+        <div class="row">
+          <button id="preview">Preview here</button>
+          <button id="sendanim" class="primary">Play on TimeBox</button>
+        </div>
+        <p class="hint">Up to 12 frames, 200 ms each at the shortest. Live drawing shows the frame you are editing; Play on TimeBox sends the whole loop.</p>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel">
+        <h2>Tools</h2>
+        <div class="row" id="tools">
+          <button data-tool="pencil" class="active">Pencil (P)</button>
+          <button data-tool="eraser">Eraser (E)</button>
+          <button data-tool="fill">Fill (F)</button>
+          <button data-tool="pick">Pick (I)</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Colour</h2>
+        <div class="row"><input type="color" id="color" value="#ff0000" aria-label="Custom colour"><span id="colorhex" class="hint" style="margin:0"></span></div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Display</h2>
+        <div class="row">
+          <label class="inline"><input type="checkbox" id="live" checked> Live</label>
+          <button id="send">Send frame</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <label for="bright">Brightness</label>
+          <input type="range" id="bright" min="0" max="100" step="5" value="100">
+          <span id="brightval" class="hint" style="margin:0;min-width:3ch">100</span>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="lamp">Lamp in this colour</button>
+          <button id="clock">Clock in this colour</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <select id="effect" aria-label="Built-in effect">
+            <option value="">Built-in effect</option>
+            <option value="0">Diagonal wipes</option>
+            <option value="1">Pulsing diamond</option>
+            <option value="2">Growing rectangles</option>
+            <option value="3">Twinkling dots</option>
+            <option value="4">Scrolling chevrons</option>
+            <option value="5">Countdown</option>
+            <option value="6">Pinwheel</option>
+            <option value="7">Sweeping line</option>
+          </select>
+          <select id="viz" aria-label="Music visualiser">
+            <option value="">Music visualiser</option>
+            <option value="0">Spectrum bars</option>
+            <option value="1">Running figure</option>
+            <option value="2">Side meters</option>
+            <option value="3">Rainbow wave</option>
+            <option value="4">Bottom bars</option>
+            <option value="5">Flame</option>
+            <option value="6">Talking face</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Canvas</h2>
+        <div class="row">
+          <button id="undo">Undo</button>
+          <button id="clear">Clear</button>
+          <button id="flipx">Flip left/right</button>
+          <button id="flipy">Flip up/down</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Saved</h2>
+        <div class="row">
+          <input type="text" id="name" placeholder="Name" maxlength="24" aria-label="Drawing name">
+          <button id="save">Save</button>
+        </div>
+        <div class="saved" id="saved"></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const N = 11, MAX_FRAMES = 12;
+const PALETTE = ['#000000','#ffffff','#ff0000','#ff8800','#ffee00','#88ff00','#00cc44','#00ddcc',
+                 '#00aaff','#0000ff','#8800ff','#ff00ff','#ff88aa','#884400','#888888','#333333'];
+const $ = id => document.getElementById(id);
+const blank = () => Array(N * N).fill('#000000');
+
+// frames[i] = { px: [121 colours], delay: ms }; px always points at the frame being edited.
+let frames = [{ px: blank(), delay: 300 }];
+let cur = 0;
+let px = frames[0].px;
+let color = '#ff0000';
+let tool = 'pencil';
+let drawing = false;
+const undoStack = [];
+
+// Round a colour to what the display can show: 4 bits per channel.
+function quant(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  const f = c => (c >> 4) * 17;
+  return '#' + [(v >> 16) & 255, (v >> 8) & 255, v & 255]
+    .map(c => f(c).toString(16).padStart(2, '0')).join('');
+}
+
+// Screen cells
+const screen = $('screen');
+const cells = [];
+for (let i = 0; i < N * N; i++) {
+  const c = document.createElement('div');
+  c.className = 'cell';
+  c.dataset.i = i;
+  screen.appendChild(c);
+  cells.push(c);
+}
+function render(showPx = px) { showPx.forEach((c, i) => { cells[i].style.background = c; }); }
+
+function drawThumb(canvas, pxs) {
+  canvas.width = canvas.height = N;
+  const g = canvas.getContext('2d');
+  pxs.forEach((col, i) => { g.fillStyle = col; g.fillRect(i % N, Math.floor(i / N), 1, 1); });
+}
+
+// Frame strip
+function renderFrames() {
+  const box = $('frames');
+  box.textContent = '';
+  frames.forEach((f, i) => {
+    const b = document.createElement('button');
+    b.className = 'frame' + (i === cur ? ' sel' : '');
+    b.setAttribute('aria-label', 'Frame ' + (i + 1));
+    const c = document.createElement('canvas');
+    drawThumb(c, f.px);
+    const s = document.createElement('span');
+    s.textContent = i + 1;
+    b.append(c, s);
+    b.onclick = () => selectFrame(i);
+    box.appendChild(b);
+  });
+  $('addframe').disabled = frames.length >= MAX_FRAMES;
+  $('delframe').disabled = frames.length <= 1;
+  $('delay').value = frames[cur].delay;
+}
+function selectFrame(i) {
+  stopPreview();
+  cur = i;
+  px = frames[cur].px;
+  render();
+  renderFrames();
+  if ($('live').checked) sendFrame();
+}
+$('addframe').onclick = () => {
+  if (frames.length >= MAX_FRAMES) return;
+  frames.splice(cur + 1, 0, { px: px.slice(), delay: frames[cur].delay });
+  selectFrame(cur + 1);
+  autosave();
+};
+$('delframe').onclick = () => {
+  if (frames.length <= 1) return;
+  frames.splice(cur, 1);
+  selectFrame(Math.min(cur, frames.length - 1));
+  autosave();
+};
+$('delay').onchange = () => {
+  const ms = Math.round(Math.min(25500, Math.max(200, +$('delay').value || 300)) / 100) * 100;
+  frames[cur].delay = ms;
+  $('delay').value = ms;
+  autosave();
+};
+
+// Preview the loop in the page
+let previewTimer = null;
+function stopPreview() {
+  if (!previewTimer) return;
+  clearTimeout(previewTimer);
+  previewTimer = null;
+  $('preview').textContent = 'Preview here';
+  render();
+}
+$('preview').onclick = () => {
+  if (previewTimer) return stopPreview();
+  $('preview').textContent = 'Stop preview';
+  let i = 0;
+  const step = () => { render(frames[i].px); const d = frames[i].delay; i = (i + 1) % frames.length; previewTimer = setTimeout(step, d); };
+  step();
+};
+
+// Colour controls
+function setColor(hex) {
+  color = quant(hex);
+  $('color').value = color;
+  $('colorhex').textContent = color;
+  document.querySelectorAll('.sw').forEach(s => s.classList.toggle('sel', s.dataset.c === color));
+}
+PALETTE.forEach(p => {
+  const b = document.createElement('button');
+  b.className = 'sw';
+  b.style.background = p;
+  b.dataset.c = quant(p);
+  b.title = p;
+  b.setAttribute('aria-label', 'Colour ' + p);
+  b.onclick = () => { setColor(p); if (tool === 'eraser' || tool === 'pick') setTool('pencil'); };
+  $('swatches').appendChild(b);
+});
+$('color').oninput = e => setColor(e.target.value);
+
+function setTool(t) {
+  tool = t;
+  document.querySelectorAll('#tools button').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+}
+document.querySelectorAll('#tools button').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+
+// Drawing
+function pushUndo() { undoStack.push({ i: cur, px: px.slice() }); if (undoStack.length > 60) undoStack.shift(); }
+
+function flood(start, to) {
+  const from = px[start];
+  if (from === to) return;
+  const stack = [start];
+  while (stack.length) {
+    const i = stack.pop();
+    if (px[i] !== from) continue;
+    px[i] = to;
+    const x = i % N, y = Math.floor(i / N);
+    if (x > 0) stack.push(i - 1);
+    if (x < N - 1) stack.push(i + 1);
+    if (y > 0) stack.push(i - N);
+    if (y < N - 1) stack.push(i + N);
+  }
+}
+
+function applyAt(e) {
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (!el || el.dataset.i === undefined) return;
+  const i = +el.dataset.i;
+  if (tool === 'pick') { setColor(px[i]); setTool('pencil'); return; }
+  const to = tool === 'eraser' ? '#000000' : color;
+  if (tool === 'fill') { flood(i, to); }
+  else if (px[i] !== to) { px[i] = to; }
+  else return;
+  changed();
+}
+
+screen.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  stopPreview();
+  screen.setPointerCapture(e.pointerId);
+  if (tool !== 'pick') pushUndo();
+  drawing = tool !== 'fill' && tool !== 'pick';
+  applyAt(e);
+});
+screen.addEventListener('pointermove', e => { if (drawing) applyAt(e); });
+const stop = () => { drawing = false; };
+screen.addEventListener('pointerup', stop);
+screen.addEventListener('pointercancel', stop);
+
+// Canvas actions (each replaces the current frame's pixels)
+function replace(newPx) { pushUndo(); px = frames[cur].px = newPx; changed(); }
+$('undo').onclick = undo;
+function undo() {
+  const prev = undoStack.pop();
+  if (!prev || prev.i >= frames.length) return;
+  cur = prev.i;
+  px = frames[cur].px = prev.px;
+  changed();
+}
+$('clear').onclick = () => replace(blank());
+$('flipx').onclick = () => replace(px.map((_, i) => px[Math.floor(i / N) * N + (N - 1 - i % N)]));
+$('flipy').onclick = () => replace(px.map((_, i) => px[(N - 1 - Math.floor(i / N)) * N + i % N]));
+
+// Talking to the tool
+let inflight = false, pending = false;
+function setLink(on, dry) {
+  $('pill').classList.toggle('on', on);
+  $('pilltext').textContent = on ? (dry ? 'Test mode, no device' : 'Connected') : 'Not connected';
+  $('connect').hidden = on;
+}
+const hexOf = pxs => pxs.map(c => c.slice(1)).join('');
+async function post(path, body) {
+  try { const r = await fetch(path, { method: 'POST', body }); setLink(r.ok); return r.ok; }
+  catch { setLink(false); return false; }
+}
+async function sendFrame() {
+  if (inflight) { pending = true; return; }
+  inflight = true;
+  await post('/frame', hexOf(px));
+  inflight = false;
+  if (pending) { pending = false; sendFrame(); }
+}
+async function poll() {
+  try {
+    const s = await (await fetch('/status', { cache: 'no-store' })).json();
+    setLink(s.connected, s.dry);
+  } catch { setLink(false); }
+}
+$('connect').onclick = async () => {
+  $('pilltext').textContent = 'Connecting';
+  try { await fetch('/connect', { method: 'POST' }); } catch {}
+  poll();
+};
+$('send').onclick = sendFrame;
+$('sendanim').onclick = async () => {
+  $('sendanim').disabled = true;
+  await post('/anim', frames.map(f => Math.max(1, Math.round(f.delay / 100)) + ' ' + hexOf(f.px)).join('\n'));
+  $('sendanim').disabled = false;
+};
+$('lamp').onclick = () => post('/lamp', color.slice(1) + ' ' + $('bright').value);
+$('clock').onclick = () => post('/clock', '24 ' + color.slice(1));
+$('live').onchange = () => { if ($('live').checked) sendFrame(); };
+$('effect').onchange = () => { const v = $('effect').value; if (v !== '') post('/view', '03 0' + v); $('effect').value = ''; };
+$('viz').onchange = () => { const v = $('viz').value; if (v !== '') post('/view', '04 0' + v); $('viz').value = ''; };
+
+let brightTimer = null;
+$('bright').oninput = () => {
+  $('brightval').textContent = $('bright').value;
+  clearTimeout(brightTimer);
+  brightTimer = setTimeout(() => post('/brightness', $('bright').value), 120);
+};
+
+function changed() { render(); renderFrames(); autosave(); if ($('live').checked) sendFrame(); }
+
+// Saving (browser storage only; every access is guarded)
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const validPx = p => Array.isArray(p) && p.length === N * N && p.every(c => /^#[0-9a-f]{6}$/.test(c));
+// Older saves held a single px array; newer ones hold frames.
+function framesOf(entry) {
+  if (entry && Array.isArray(entry.frames)) {
+    const fs = entry.frames.filter(f => f && validPx(f.px)).slice(0, MAX_FRAMES)
+      .map(f => ({ px: f.px.slice(), delay: Math.min(25500, Math.max(200, +f.delay || 300)) }));
+    if (fs.length) return fs;
+  }
+  if (entry && validPx(entry.px)) return [{ px: entry.px.slice(), delay: 300 }];
+  return null;
+}
+function autosave() { store.set('tbm.current', { frames }); }
+
+function renderSaved() {
+  const list = store.get('tbm.saved') || [];
+  const box = $('saved');
+  box.textContent = '';
+  list.forEach((s, idx) => {
+    const fs = framesOf(s);
+    if (!fs) return;
+    const t = document.createElement('div');
+    t.className = 'thumb';
+    const c = document.createElement('canvas');
+    drawThumb(c, fs[0].px);
+    c.title = 'Load ' + s.name + (fs.length > 1 ? ' (' + fs.length + ' frames)' : '');
+    c.onclick = () => { stopPreview(); frames = fs.map(f => ({ px: f.px.slice(), delay: f.delay })); undoStack.length = 0; selectFrame(0); autosave(); };
+    const d = document.createElement('button');
+    d.className = 'del';
+    d.textContent = '×';
+    d.setAttribute('aria-label', 'Delete ' + s.name);
+    d.onclick = () => { list.splice(idx, 1); store.set('tbm.saved', list); renderSaved(); };
+    const n = document.createElement('div');
+    n.textContent = s.name + (fs.length > 1 ? ' · ' + fs.length : '');
+    t.append(c, d, n);
+    box.appendChild(t);
+  });
+}
+$('save').onclick = () => {
+  const list = store.get('tbm.saved') || [];
+  const name = $('name').value.trim() || 'Drawing ' + (list.length + 1);
+  list.push({ name, frames: frames.map(f => ({ px: f.px.slice(), delay: f.delay })) });
+  store.set('tbm.saved', list);
+  $('name').value = '';
+  renderSaved();
+};
+
+// Keyboard
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = { p: 'pencil', e: 'eraser', f: 'fill', i: 'pick' }[e.key.toLowerCase()];
+  if (t) setTool(t);
+});
+
+// Start
+const savedNow = store.get('tbm.current');
+const restored = Array.isArray(savedNow) ? framesOf({ px: savedNow }) : framesOf(savedNow);
+if (restored) { frames = restored; px = frames[0].px; }
+setColor(color);
+render();
+renderFrames();
+renderSaved();
+poll();
+setInterval(poll, 2500);
+</script>
+</body>
+</html>

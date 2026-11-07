@@ -1,0 +1,8 @@
+# The compiled tool
+/tb
+# Camera recordings and scan logs: they can contain your room and your alarms/reminders
+/runs/
+*.mov
+*.log
+.DS_Store
+/.impeccable/

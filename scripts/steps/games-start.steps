@@ -1,0 +1,7 @@
+game 0 | raw a0 01 00
+game 1 | raw a0 01 01
+game 2 | raw a0 01 02
+game 3 | raw a0 01 03
+game 4 | raw a0 01 04
+game 5 | raw a0 01 05
+game off | raw a0 00 00
